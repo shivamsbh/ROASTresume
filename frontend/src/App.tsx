@@ -42,21 +42,31 @@ function App() {
     const formData = new FormData();
     formData.append("resume", file);
 
+    const base = (BACKENDURL || "").replace(/\/+$/, "");
+    const url = base + "/roast/resume";
+
     try {
-      const response = await fetch(BACKENDURL + "/roast/resume/", {
+      const response = await fetch(url, {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error("Failed to upload resume");
+        let message = "Failed to upload resume";
+        try {
+          const err = await response.json();
+          if (err?.message) message = err.message;
+        } catch (_) {
+          // ignore parse errors
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
       setRoast(data.roast);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading resume:", error);
-      alert("Failed to upload resume. Please try again.");
+      alert(error?.message || "Failed to upload resume. Please try again.");
     } finally {
       setIsLoading(false);
     }

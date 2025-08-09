@@ -25,43 +25,66 @@ app.use(express_1.default.json());
 // Configure multer for file upload
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
-    limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB limit
-    }
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
+    res.status(200).json({ message: "working" });
+});
+app.get("/health", (_req, res) => {
     res.status(200).json({
-        message: "working"
+        status: "ok",
+        provider: "openrouter",
+        model: process.env.AI_MODEL || "deepseek/deepseek-chat-v3-0324:free",
+        baseURL: process.env.AI_BASE_URL || "https://openrouter.ai/api/v1",
+        hasKey: Boolean(process.env.OPENROUTER_API_KEY),
     });
 });
 app.post("/save", (req, res) => {
-    console.log(req.body.roast);
-    res.status(200).json({
-        id: "ajdashldas"
-    });
+    var _a;
+    console.log((_a = req.body) === null || _a === void 0 ? void 0 : _a.roast);
+    res.status(200).json({ id: "ajdashldas" });
 });
-app.post("/roast/resume", upload.single('resume'), (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+app.post("/roast/resume", upload.single("resume"), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         if (!req.file) {
             res.status(400).json({ message: "No resume file provided" });
             return;
         }
+        if (req.file.mimetype !== "application/pdf") {
+            res.status(400).json({ message: "Only PDF files are supported" });
+            return;
+        }
         const pdfData = yield (0, pdf_parse_1.default)(req.file.buffer);
-        const resumeContent = pdfData.text;
+        const resumeContent = (pdfData.text || "").trim();
+        if (!resumeContent) {
+            res.status(400).json({ message: "Could not extract text from PDF" });
+            return;
+        }
         const roast = yield (0, ai_1.generateRoast)(resumeContent);
-        res.status(200).json({
-            message: "Resume received successfully",
-            roast
-        });
+        res.status(200).json({ message: "Success", roast });
     }
     catch (error) {
-        console.error('Error processing resume:', error);
-        res.status(500).json({
-            message: "Error processing resume",
-            error: error instanceof Error ? error.message : String(error)
-        });
+        console.error("Error processing resume:", error);
+        const message = error instanceof Error ? error.message : "Error processing resume";
+        res.status(500).json({ message });
     }
 }));
-app.listen(3001, () => {
-    console.log("Server running on port 3001");
+// Multer error handler (e.g., file too large)
+app.use((err, _req, res, next) => {
+    if (err instanceof multer_1.default.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+            return res.status(400).json({ message: "File too large. Max size is 5MB" });
+        }
+        return res.status(400).json({ message: `Upload error: ${err.message}` });
+    }
+    return next(err);
+});
+// General error handler fallback
+app.use((err, _req, res, _next) => {
+    console.error("Unhandled error:", err);
+    res.status(500).json({ message: "Internal server error" });
+});
+const PORT = Number(process.env.PORT) || 3001;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });

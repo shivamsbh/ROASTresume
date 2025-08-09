@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsc --build && node dist/index.js"
+    "build": "tsc --build",
+    "start": "node dist/index.js",
+    "dev": "npm run build && npm run start",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
@@ -12,16 +14,18 @@
   "description": "",
   "dependencies": {
     "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0",
+    "@types/express": "^4.17.21",
     "@types/multer": "^1.4.12",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "multer": "^1.4.5-lts.1",
-    "openai": "^4.76.0",
+    "axios": "^1.7.9",
     "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
+    "@types/node": "^20.12.7",
+    "typescript": "^5.6.3",
     "@types/pdf-parse": "^1.1.4"
   }
 }
