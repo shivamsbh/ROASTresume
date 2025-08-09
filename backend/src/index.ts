@@ -11,10 +11,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configure multer for file upload
+// Configure multer for file upload with optimizations
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { 
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 1, // Only allow 1 file
+    fields: 1, // Only allow 1 field
+    parts: 2 // Limit total parts
+  },
+  fileFilter: (req, file, cb) => {
+    // Pre-filter files to reject non-PDFs immediately
+    if (file.mimetype !== 'application/pdf') {
+      return cb(null, false);
+    }
+    cb(null, true);
+  }
 });
 
 app.get("/", (_req: Request, res: Response) => {
@@ -40,18 +52,31 @@ app.post(
   "/roast/resume",
   upload.single("resume"),
   async (req: Request, res: Response): Promise<void> => {
+    const startTime = Date.now();
     try {
       if (!req.file) {
         res.status(400).json({ message: "No resume file provided" });
         return;
       }
 
+      // File type already validated by fileFilter, but double-check for safety
       if (req.file.mimetype !== "application/pdf") {
         res.status(400).json({ message: "Only PDF files are supported" });
         return;
       }
 
-      const pdfData = await pdfParse(req.file.buffer);
+      const memoryBefore = process.memoryUsage().heapUsed / 1024 / 1024;
+      console.log(`Processing PDF (${req.file.size} bytes)... Memory: ${memoryBefore.toFixed(2)}MB`);
+      
+      // Process PDF parsing and AI generation in parallel where possible
+      const pdfParseStart = Date.now();
+      const pdfData = await pdfParse(req.file.buffer, {
+        // Optimize PDF parsing
+        max: 50000, // Limit text extraction to 50k chars for faster processing
+        version: 'v1.10.100' // Use specific version for consistency
+      });
+      const pdfParseTime = Date.now() - pdfParseStart;
+      
       const resumeContent = (pdfData.text || "").trim();
 
       if (!resumeContent) {
@@ -59,12 +84,52 @@ app.post(
         return;
       }
 
-      const roast = await generateRoast(resumeContent);
-      res.status(200).json({ message: "Success", roast });
+      // Truncate content if too long to reduce AI processing time
+      const maxContentLength = 8000; // Reasonable limit for AI processing
+      const processedContent = resumeContent.length > maxContentLength 
+        ? resumeContent.substring(0, maxContentLength) + "..."
+        : resumeContent;
+
+      console.log(`Extracted ${resumeContent.length} characters (${pdfParseTime}ms). Processing ${processedContent.length} chars for roast...`);
+      
+      const aiStart = Date.now();
+      const roast = await generateRoast(processedContent);
+      const aiTime = Date.now() - aiStart;
+      const totalTime = Date.now() - startTime;
+      
+      // Explicitly clear memory references
+      req.file.buffer = Buffer.alloc(0); // Clear the buffer
+      
+      const memoryAfter = process.memoryUsage().heapUsed / 1024 / 1024;
+      console.log(`Roast generated in ${totalTime}ms (PDF: ${pdfParseTime}ms, AI: ${aiTime}ms)`);
+      console.log(`Memory: ${memoryBefore.toFixed(2)}MB → ${memoryAfter.toFixed(2)}MB (${(memoryAfter - memoryBefore).toFixed(2)}MB change)`);
+      
+      res.status(200).json({ 
+        message: "Success", 
+        roast,
+        processingTime: `${totalTime}ms`,
+        breakdown: {
+          pdfParsing: `${pdfParseTime}ms`,
+          aiGeneration: `${aiTime}ms`,
+          total: `${totalTime}ms`
+        }
+      });
     } catch (error) {
-      console.error("Error processing resume:", error);
+      const processingTime = Date.now() - startTime;
+      console.error(`Error processing resume after ${processingTime}ms:`, error);
       const message = error instanceof Error ? error.message : "Error processing resume";
-      res.status(500).json({ message });
+      
+      // Clear memory even on error
+      if (req.file?.buffer) {
+        req.file.buffer = Buffer.alloc(0);
+      }
+      
+      res.status(500).json({ message, processingTime: `${processingTime}ms` });
+    } finally {
+      // Force garbage collection hint (if available)
+      if (global.gc) {
+        global.gc();
+      }
     }
   }
 );

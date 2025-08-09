@@ -1,6 +1,7 @@
 import "./App.css";
 import { useState } from "react";
 import { Upload, FileText, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
@@ -63,7 +64,14 @@ function App() {
       }
 
       const data = await response.json();
-      setRoast(data.roast);
+      console.log("Response data:", data);
+      
+      if (data.roast) {
+        setRoast(data.roast);
+      } else {
+        console.error("No roast in response:", data);
+        throw new Error("No roast content received from server");
+      }
     } catch (error: any) {
       console.error("Error uploading resume:", error);
       alert(error?.message || "Failed to upload resume. Please try again.");
@@ -86,9 +94,37 @@ function App() {
               </h2>
             </div>
             <div className="prose prose-invert max-w-none bg-transparent">
-              <p className="leading-relaxed whitespace-pre-wrap text-gray-300 bg-transparent">
-                {roast}
-              </p>
+              <div className="leading-relaxed text-gray-300 bg-transparent">
+                <ReactMarkdown 
+                  components={{
+                  // Custom styling for markdown elements
+                  p: ({children, ...props}) => <p className="mb-4 leading-relaxed text-gray-300" {...props}>{children}</p>,
+                  strong: ({children, ...props}) => <strong className="text-red-400 font-bold" {...props}>{children}</strong>,
+                  em: ({children, ...props}) => <em className="text-yellow-400 italic" {...props}>{children}</em>,
+                  h1: ({children, ...props}) => <h1 className="text-2xl font-bold text-red-500 mb-4" {...props}>{children}</h1>,
+                  h2: ({children, ...props}) => <h2 className="text-xl font-bold text-red-400 mb-3" {...props}>{children}</h2>,
+                  h3: ({children, ...props}) => <h3 className="text-lg font-bold text-red-300 mb-2" {...props}>{children}</h3>,
+                  ul: ({children, ...props}) => <ul className="list-disc list-inside mb-4 space-y-1" {...props}>{children}</ul>,
+                  ol: ({children, ...props}) => <ol className="list-decimal list-inside mb-4 space-y-1" {...props}>{children}</ol>,
+                  li: ({children, ...props}) => <li className="text-gray-300" {...props}>{children}</li>,
+                  blockquote: ({children, ...props}) => <blockquote className="border-l-4 border-red-500 pl-4 italic text-gray-400 mb-4" {...props}>{children}</blockquote>,
+                  code: ({children, ...props}) => <code className="bg-gray-800 text-green-400 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>,
+                }}
+                >
+                  {roast}
+                </ReactMarkdown>
+              </div>
+            </div>
+            <div className="flex justify-center mt-6">
+              <button
+                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors"
+                onClick={() => {
+                  setRoast("");
+                  setFile(null);
+                }}
+              >
+                Roast Another Resume
+              </button>
             </div>
           </div>
         </div>
