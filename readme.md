@@ -791,13 +791,7 @@ console.log("API response:", data);
 1. **Check the Issues**: Look for similar problems in GitHub issues
 2. **Debug Logs**: Enable console logging to identify the problem
 3. **Documentation**: Review this README and official docs
-4. **Community**: Ask questions in discussions or create an issue
-
----
-
-## 📝 License
-
-This project is open source and available under the [MIT License](LICENSE).
+4. **Community**: Ask questions in discussions or create an issue.
 
 ## 🙏 Acknowledgments
 
